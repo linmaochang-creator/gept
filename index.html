@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f6fed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="英檢特攻隊">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>英檢特攻隊</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--pri:#2f6fed;--ok:#1aa36a;--bad:#e5484d;--tx:#1d2433;--mu:#6b7488}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 -apple-system,"PingFang TC","Noto Sans TC",sans-serif;padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+header{background:var(--pri);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:18px}
+.chip{background:rgba(255,255,255,.2);padding:4px 10px;border-radius:99px;font-size:13px}
+main{padding:14px;max-width:640px;margin:auto}
+.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+h2{margin:0 0 8px;font-size:18px}
+.mu{color:var(--mu);font-size:14px}
+button{font:inherit;border:0;border-radius:12px;padding:12px 16px;background:var(--pri);color:#fff;cursor:pointer}
+button.sec{background:#e8eefc;color:var(--pri)}
+button:disabled{opacity:.5}
+.opt{display:block;width:100%;text-align:left;background:#fff;color:var(--tx);border:2px solid #e3e8f2;margin-top:8px}
+.opt.ok{border-color:var(--ok);background:#e8f8f1}
+.opt.bad{border-color:var(--bad);background:#fdecec}
+.big{font-size:30px;font-weight:700;text-align:center;margin:8px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:#fff;border-radius:16px;padding:16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.tile b{display:block;font-size:22px}
+textarea,input[type=text],input[type=url]{width:100%;font:inherit;padding:12px;border:2px solid #e3e8f2;border-radius:12px;background:#fff}
+textarea{min-height:150px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid #e3e8f2;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;color:var(--mu);border-radius:0;padding:8px 0;font-size:11px}
+nav button span{display:block;font-size:20px}
+nav button.on{color:var(--pri);font-weight:700}
+.bub{padding:10px 14px;border-radius:16px;margin:8px 0;max-width:86%;white-space:pre-wrap}
+.me{background:var(--pri);color:#fff;margin-left:auto}
+.ai{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.fb{background:#f3f7ff;border-radius:12px;padding:12px;margin-top:10px;white-space:pre-wrap}
+.bar{height:8px;background:#e3e8f2;border-radius:99px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok)}
+</style>
+</head>
+<body>
+<header><h1>🦉 英檢特攻隊</h1><div class="row"><span class="chip" id="hStreak"></span><span class="chip" id="hXp"></span></div></header>
+<main id="app"></main>
+<nav id="nav"></nav>
+
+<script src="data.js"></script>
+<script>
+/* 題庫在 data.js */
+const SCEN=[
+["餐廳點餐","You are a friendly waiter at a restaurant. The student is a customer."],
+["問路","You are a local person. The student is a tourist asking for directions."],
+["自我介紹","You are a new foreign classmate meeting the student for the first time."],
+["購物","You are a clerk in a clothing store. The student wants to buy a T-shirt."],
+["自由聊天","You are a friendly English-speaking pen pal."]
+];
+const SYS="你是台灣國中生的英語老師，程度對應全民英檢初級（CEFR A2）。回覆一律使用繁體中文說明，英文例句要簡單。";
+
+/* ===== 狀態 ===== */
+const K="gept_v1";
+let S=Object.assign({xp:0,streak:0,last:"",wrong:[],cnt:{v:0,l:0,s:0,w:0,c:0},api:""},JSON.parse(localStorage.getItem(K)||"{}"));
+const save=()=>localStorage.setItem(K,JSON.stringify(S));
+const today=()=>new Date().toISOString().slice(0,10);
+function gain(n,k){S.xp+=n;if(k)S.cnt[k]++;
+ const t=today();if(S.last!==t){const y=new Date(Date.now()-864e5).toISOString().slice(0,10);S.streak=S.last===y?S.streak+1:1;S.last=t}
+ save();head()}
+function head(){hStreak.textContent="🔥 "+S.streak+" 天";hXp.textContent="⭐ "+S.xp}
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
+
+/* ===== 語音 ===== */
+function say(t,rate=.9){if(!window.speechSynthesis)return alert("此瀏覽器不支援語音播放");
+ speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang="en-US";u.rate=rate;speechSynthesis.speak(u)}
+
+/* ===== Claude（透過你自己的代理網址，見 worker.js） ===== */
+async function ask(messages,system=SYS){
+ if(!S.api)throw new Error("NOAPI");
+ const r=await fetch(S.api,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({system,messages})});
+ if(!r.ok)throw new Error("API "+r.status);
+ return (await r.json()).text;
+}
+const noApi=()=>'<div class="fb">尚未設定 Claude 代理網址。請到「首頁 → 設定」填入（老師／家長協助），其他練習不受影響。</div>';
+
+/* ===== 路由 ===== */
+const TABS=[["home","🏠","首頁"],["vocab","📖","單字"],["listen","🎧","聽力"],["speak","🎤","口說"],["write","✍️","寫作"],["chat","💬","AI對話"]];
+let cur="home";
+function go(t){cur=t;nav.innerHTML=TABS.map(x=>`<button class="${x[0]==t?"on":""}" onclick="go('${x[0]}')"><span>${x[1]}</span>${x[2]}</button>`).join("");
+ ({home,vocab,listen,speak,write,chat})[t]();scrollTo(0,0)}
+
+/* ===== 首頁 ===== */
+function home(){
+ const c=S.cnt;
+ app.innerHTML=`<div class="card"><h2>今天也來練一點 💪</h2><div class="mu">每天 15 分鐘，英檢初級穩穩來。</div></div>
+ <div class="grid">
+ <div class="tile"><b>${c.v}</b>單字題</div><div class="tile"><b>${c.l}</b>聽力題</div>
+ <div class="tile"><b>${c.s}</b>口說練習</div><div class="tile"><b>${c.w}</b>寫作批改</div></div>
+ <div class="card" style="margin-top:12px"><h2>錯題本</h2><div class="mu">目前 ${S.wrong.length} 個單字待複習</div>
+ <div class="row" style="margin-top:8px"><button onclick="go('vocab');setTimeout(()=>vquiz(true),0)" ${S.wrong.length?"":"disabled"}>複習錯題</button></div></div>
+ <div class="card"><h2>設定</h2><div class="mu">Claude 代理網址（見 worker.js 部署說明）</div>
+ <input type="url" id="api" placeholder="https://xxx.workers.dev" value="${esc(S.api)}" style="margin:8px 0">
+ <button class="sec" onclick="S.api=api.value.trim();save();alert('已儲存')">儲存</button>
+ <p class="mu">資料只存在這支手機裡。</p></div>`;
+}
+
+/* ===== 單字 ===== */
+function vocab(){app.innerHTML=`<div class="card"><h2>單字訓練室</h2><div class="row"><button onclick="vquiz()">選擇題</button><button class="sec" onclick="vcard()">單字卡</button></div></div><div id="v"></div>`;vquiz()}
+function vcard(){const w=pick(VOCAB);
+ v.innerHTML=`<div class="card"><div class="big">${w[0]}</div><div class="mu" style="text-align:center">${w[2]}</div>
+ <div class="row" style="justify-content:center;margin:10px 0"><button class="sec" onclick="say('${w[0]}',.8)">🔊 發音</button><button class="sec" onclick="this.nextElementSibling.style.visibility='visible'">看中文</button><b style="visibility:hidden;font-size:20px">${w[1]}</b></div>
+ <button style="width:100%" onclick="gain(1,'v');vcard()">下一張</button></div>`}
+function vquiz(wrongOnly){
+ let pool=wrongOnly&&S.wrong.length?VOCAB.filter(w=>S.wrong.includes(w[0])):VOCAB;
+ const w=pick(pool),opts=shuffle([w,...shuffle(VOCAB.filter(x=>x!==w)).slice(0,3)]);
+ v.innerHTML=`<div class="card"><div class="mu">${wrongOnly?"錯題複習":"選出正確的中文"}</div><div class="big">${w[0]}</div>
+ <div style="text-align:center"><button class="sec" onclick="say('${w[0]}',.8)">🔊</button></div>
+ ${opts.map((o,i)=>`<button class="opt" data-i="${i}">${o[1]}</button>`).join("")}<div id="vr"></div></div>`;
+ v.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+  const o=opts[b.dataset.i],ok=o===w;
+  v.querySelectorAll(".opt").forEach(x=>{x.disabled=true;if(opts[x.dataset.i]===w)x.classList.add("ok")});
+  if(!ok){b.classList.add("bad");if(!S.wrong.includes(w[0]))S.wrong.push(w[0])}
+  else{S.wrong=S.wrong.filter(x=>x!==w[0])}
+  gain(ok?2:0,"v");
+  vr.innerHTML=`<div class="fb">${ok?"✅ 答對了！":"❌ 正確答案："+w[1]}（${w[2]}）</div><button style="margin-top:10px;width:100%" onclick="vquiz(${!!wrongOnly})">下一題</button>`;});
+}
+
+/* ===== 聽力 ===== */
+function listen(){
+ const q=pick(LISTEN);
+ app.innerHTML=`<div class="card"><h2>聽力測驗中心</h2><div class="mu">先聽，再選答案。可重播（建議最多 2 次）。</div>
+ <div class="row" style="margin:10px 0"><button onclick="say(${JSON.stringify(q.s).replace(/"/g,"&quot;")},.85)">▶ 播放</button><button class="sec" onclick="say(${JSON.stringify(q.s).replace(/"/g,"&quot;")},.65)">🐢 慢速</button></div>
+ <b>${q.q}</b>${q.o.map((o,i)=>`<button class="opt" data-i="${i}">${String.fromCharCode(65+i)}. ${o}</button>`).join("")}<div id="lr"></div></div>`;
+ app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{const ok=+b.dataset.i===q.a;
+  app.querySelectorAll(".opt").forEach(x=>{x.disabled=true;if(+x.dataset.i===q.a)x.classList.add("ok")});
+  if(!ok)b.classList.add("bad");gain(ok?3:0,"l");
+  lr.innerHTML=`<div class="fb">${ok?"✅ 答對了！":"❌ 再接再厲"}\n\n原文：${q.s}</div><button style="margin-top:10px;width:100%" onclick="listen()">下一題</button>`});
+}
+
+/* ===== 口說 ===== */
+function speak(){
+ const t=pick(SPEAK),SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ app.innerHTML=`<div class="card"><h2>口說練習教室</h2><b>${t.p}</b>
+ <div class="row" style="margin:12px 0"><button id="rec" ${SR?"":"disabled"}>🎤 開始回答</button><button class="sec" onclick="speak()">換題</button></div>
+ ${SR?"":'<div class="mu">此瀏覽器不支援語音辨識，iPhone 請用 Safari 並允許麥克風；或改用下方文字輸入。</div>'}
+ <textarea id="tx" placeholder="辨識結果會顯示在這裡，也可以直接打字" style="min-height:90px"></textarea>
+ <button style="margin-top:10px;width:100%" id="chk">AI 給建議</button><div id="sr"></div></div>`;
+ if(SR){let r=null,on=false;rec.onclick=()=>{
+  if(on){r.stop();return}
+  r=new SR();r.lang="en-US";r.interimResults=true;r.continuous=true;
+  r.onresult=e=>{tx.value=[...e.results].map(x=>x[0].transcript).join(" ")};
+  r.onend=()=>{on=false;rec.textContent="🎤 開始回答"};r.onerror=()=>{on=false;rec.textContent="🎤 開始回答"};
+  r.start();on=true;rec.textContent="⏹ 停止"}}
+ chk.onclick=async()=>{const a=tx.value.trim();if(!a)return;gain(3,"s");
+  const hit=t.k.filter(k=>a.toLowerCase().includes(k)).length;
+  sr.innerHTML=`<div class="fb">字數：${a.split(/\s+/).length}　關鍵詞命中：${hit}/${t.k.length}</div><div id="ai"></div>`;
+  try{ai.innerHTML='<div class="fb">Claude 思考中…</div>';
+   const x=await ask([{role:"user",content:`題目：${t.p}\n學生口說（語音轉文字，標點與發音不計）：${a}\n請依序：1) 一句鼓勵 2) 文法或用字錯誤與修正 3) 一個更自然的說法示範 4) 一個加分建議。簡短條列。`}]);
+   ai.innerHTML=`<div class="fb">${esc(x)}</div>`}catch(e){ai.innerHTML=e.message==="NOAPI"?noApi():'<div class="fb">連線失敗，請稍後再試。</div>'}};
+}
+
+/* ===== 寫作 ===== */
+function write(){
+ const p=pick(WRITE);
+ app.innerHTML=`<div class="card"><h2>英文寫作批改</h2><b>${p}</b>
+ <textarea id="tx" placeholder="Write here..." style="margin-top:10px"></textarea><div class="mu" id="wc">0 words</div>
+ <div class="row" style="margin-top:8px"><button id="go1">AI 批改</button><button class="sec" onclick="write()">換題</button></div><div id="wr"></div></div>`;
+ tx.oninput=()=>wc.textContent=(tx.value.trim()?tx.value.trim().split(/\s+/).length:0)+" words";
+ go1.onclick=async()=>{const a=tx.value.trim();if(a.split(/\s+/).length<10)return alert("請至少寫 10 個字");
+  wr.innerHTML='<div class="fb">Claude 批改中…</div>';
+  try{const x=await ask([{role:"user",content:`題目：${p}\n學生作文：\n${a}\n\n請用繁體中文批改：1) 總評與分數（滿分 5 分，依內容、組織、文法、用字）2) 錯誤列表（原句→修正→簡短原因）3) 修改後完整版本 4) 兩個下次可以進步的重點。語氣親切、不要太嚴苛。`}]);
+   gain(5,"w");wr.innerHTML=`<div class="fb">${esc(x)}</div>`}catch(e){wr.innerHTML=e.message==="NOAPI"?noApi():'<div class="fb">連線失敗，請稍後再試。</div>'}};
+}
+
+/* ===== AI 對話 ===== */
+let hist=[],scen=0;
+function chat(){
+ app.innerHTML=`<div class="card"><h2>AI 英文家教</h2>
+ <select id="sc" style="width:100%;padding:10px;font:inherit;border-radius:12px;border:2px solid #e3e8f2">${SCEN.map((s,i)=>`<option value="${i}" ${i==scen?"selected":""}>${s[0]}</option>`).join("")}</select>
+ <div class="row" style="margin-top:8px"><button class="sec" onclick="hist=[];scen=+sc.value;chat();start()">開始新對話</button><button class="sec" onclick="recap()">結束並總結</button></div></div>
+ <div id="log"></div>
+ <div class="row" style="position:sticky;bottom:76px"><input type="text" id="in" placeholder="Type in English..." style="flex:1"><button id="snd">送出</button></div>`;
+ hist.forEach(m=>bub(m.role,m.content));
+ snd.onclick=send;document.getElementById("in").onkeydown=e=>{if(e.key==="Enter")send()};
+ if(!hist.length)start();
+}
+function bub(r,t){const d=document.createElement("div");d.className="bub "+(r=="user"?"me":"ai");d.textContent=t;
+ if(r!="user"){const b=document.createElement("div");b.innerHTML='<a href="#" style="font-size:13px">🔊 聽</a>';b.firstChild.onclick=e=>{e.preventDefault();say(t)};d.appendChild(b)}
+ log.appendChild(d);d.scrollIntoView({block:"end"})}
+const csys=()=>`${SCEN[scen][1]} Speak ONLY simple English (CEFR A2, short sentences, 1-3 sentences). Keep the conversation going by asking one question each turn. If the student makes a mistake, reply naturally and add a very short correction in parentheses at the end, like (Tip: "I go" → "I went").`;
+async function start(){await turn([{role:"user",content:"Hello! Please start the conversation."}],true)}
+async function turn(msgs,hide){
+ try{const x=await ask(msgs,csys());if(!hide)hist.push({role:"user",content:msgs[msgs.length-1].content});
+  hist.push({role:"assistant",content:x});bub("assistant",x)}
+ catch(e){const d=document.createElement("div");d.innerHTML=e.message==="NOAPI"?noApi():'<div class="fb">連線失敗，請稍後再試。</div>';log.appendChild(d)}}
+async function send(){const el=document.getElementById("in"),t=el.value.trim();if(!t)return;el.value="";bub("user",t);gain(2,"c");
+ const msgs=[{role:"user",content:"Hello! Please start the conversation."},...hist,{role:"user",content:t}];
+ const clean=msgs.filter((m,i)=>i===0||m.content!==msgs[i-1].content);
+ await turn(clean)}
+async function recap(){if(hist.length<3)return alert("先多聊幾句再總結吧！");
+ const d=document.createElement("div");d.className="fb";d.textContent="Claude 整理中…";log.appendChild(d);
+ try{const x=await ask([{role:"user",content:"以下是學生與 AI 的英文對話，請用繁體中文：1) 整體表現一句話 2) 學生的錯誤與修正（最多 4 項）3) 3 個值得學的實用句 4) 3 個新單字（含中文）。\n\n"+hist.map(m=>(m.role=="user"?"Student: ":"AI: ")+m.content).join("\n")}]);
+  d.textContent=x}catch(e){d.innerHTML=e.message==="NOAPI"?noApi():"連線失敗"}}
+
+head();go("home");
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
